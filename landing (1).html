@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyFlow — Upload. Leer. Slaag.</title>
+  <meta name="description" content="Upload een PDF en krijg automatisch een samenvatting, flashcards en een quiz. Studeren was nog nooit zo makkelijk.">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400;1,9..144,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:      #0b0c11;
+      --surface: #13151c;
+      --surface2:#1a1d27;
+      --border:  #252836;
+      --text:    #edeef5;
+      --muted:   #7c8099;
+      --accent:  #c8f25a;
+      --blue:    #5a8cf2;
+      --pink:    #f25a8c;
+      --radius:  14px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 48px;
+      background: rgba(11,12,17,0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .nav-logo {
+      font-family: 'Fraunces', serif;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-links a {
+      font-size: 14px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      padding: 10px 24px;
+      background: var(--accent);
+      color: #000;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,242,90,0.3); }
+
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .nav-links { display: none; }
+    }
+
+    /* ── HAMBURGER ── */
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 42px; height: 42px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      cursor: pointer;
+      gap: 5px;
+      position: relative;
+      z-index: 201;
+      transition: border-color 0.2s;
+    }
+    .hamburger:hover { border-color: var(--accent); }
+
+    .h-lijn {
+      width: 18px; height: 1.5px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-origin: center;
+    }
+
+    /* X animatie */
+    .hamburger.open .h-lijn:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+    .hamburger.open .h-lijn:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    .hamburger.open .h-lijn:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+    /* ── MOBIEL FULLSCREEN MENU ── */
+    .mobiel-menu {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(-16px) scale(0.98);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      overflow: hidden;
+    }
+
+    /* Achtergrond */
+    .mobiel-menu::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      z-index: -2;
+    }
+
+    /* Raster patroon */
+    .mobiel-menu::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 60px 60px;
+      opacity: 0.3;
+      z-index: -1;
+    }
+
+    .mobiel-menu.open {
+      pointer-events: all;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* Groene gloed in het midden */
+    .menu-gloed {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(200,242,90,0.06) 0%, transparent 65%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .mobiel-nav-links {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      max-width: 360px;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .mobiel-nav-link {
+      display: block;
+      width: 100%;
+      padding: 16px 24px;
+      font-family: 'Fraunces', serif;
+      font-size: 24px;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      border-radius: var(--radius);
+      text-align: center;
+      letter-spacing: -0.3px;
+      border: 1px solid transparent;
+      transition: color 0.2s, background 0.2s, border-color 0.2s;
+      /* Staggered animatie */
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    .mobiel-menu.open .mobiel-nav-link { opacity: 1; transform: translateY(0); }
+    .mobiel-menu.open .mobiel-nav-link:nth-child(1) { transition: opacity 0.25s ease 0.07s, transform 0.25s ease 0.07s, color 0.2s, background 0.2s; }
+    .mobiel-menu.open .mobiel-nav-link:nth-child(2) { transition: opacity 0.25s ease 0.12s, transform 0.25s ease 0.12s, color 0.2s, background 0.2s; }
+    .mobiel-menu.open .mobiel-nav-link:nth-child(3) { transition: opacity 0.25s ease 0.17s, transform 0.25s ease 0.17s, color 0.2s, background 0.2s; }
+    .mobiel-menu.open .mobiel-nav-link:nth-child(4) { transition: opacity 0.25s ease 0.22s, transform 0.25s ease 0.22s, color 0.2s, background 0.2s; }
+
+    .mobiel-nav-link:hover {
+      color: var(--text);
+      background: var(--surface);
+      border-color: var(--border);
+    }
+
+    .mobiel-cta-wrap {
+      margin-top: 24px;
+      position: relative;
+      z-index: 1;
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    .mobiel-menu.open .mobiel-cta-wrap {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.25s ease 0.27s, transform 0.25s ease 0.27s;
+    }
+
+    @media (max-width: 768px) {
+      .hamburger { display: flex; }
+      .nav-logo { position: relative; z-index: 201; }
+      body.menu-open { overflow: hidden; }
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Grote achtergrond gloed */
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px; left: 50%;
+      transform: translateX(-50%);
+      width: 900px; height: 900px;
+      background: radial-gradient(circle, rgba(200,242,90,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* Raster achtergrond */
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(200,242,90,0.08);
+      border: 1px solid rgba(200,242,90,0.2);
+      border-radius: 100px;
+      font-size: 12px;
+      color: var(--accent);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .hero-tag::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: puls 2s ease-in-out infinite;
+    }
+
+    @keyframes puls { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .hero-titel {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(44px, 8vw, 84px);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -3px;
+      max-width: 900px;
+      position: relative;
+      z-index: 1;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease 0.1s both;
+    }
+
+    .hero-titel em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .hero-sub {
+      font-size: clamp(16px, 2.5vw, 20px);
+      color: var(--muted);
+      max-width: 560px;
+      line-height: 1.65;
+      position: relative;
+      z-index: 1;
+      margin-bottom: 40px;
+      animation: fadeUp 0.6s ease 0.2s both;
+    }
+
+    .hero-knoppen {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.6s ease 0.3s both;
+    }
+
+    .knop-groot {
+      padding: 16px 36px;
+      background: var(--accent);
+      color: #000;
+      border-radius: 100px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.25s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .knop-groot:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(200,242,90,0.35); }
+
+    .knop-ghost {
+      padding: 16px 36px;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 100px;
+      font-size: 16px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .knop-ghost:hover { border-color: var(--muted); }
+
+    /* Social proof */
+    .social-proof {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 48px;
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.6s ease 0.4s both;
+    }
+
+    .avatars {
+      display: flex;
+    }
+    .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+      margin-left: -8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .avatar:first-child { margin-left: 0; }
+    .av1 { background: #5a8cf2; color: white; }
+    .av2 { background: #f25a8c; color: white; }
+    .av3 { background: #c8f25a; color: #000; }
+    .av4 { background: #f2a55a; color: white; }
+
+    .social-tekst { font-size: 13px; color: var(--muted); line-height: 1.4; }
+    .social-tekst strong { color: var(--text); }
+
+    /* ── DEMO SCHERM ── */
+    .demo-wrap {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 24px 100px;
+      position: relative;
+    }
+
+    .demo-scherm {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+      animation: fadeUp 0.8s ease 0.5s both;
+    }
+
+    .demo-topbalk {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .demo-cirkel { width: 12px; height: 12px; border-radius: 50%; }
+    .dc-rood   { background: #ff5f57; }
+    .dc-geel   { background: #febc2e; }
+    .dc-groen  { background: #28c840; }
+
+    .demo-url {
+      flex: 1;
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 12px;
+    }
+
+    .demo-inhoud {
+      padding: 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) { .demo-inhoud { grid-template-columns: 1fr; } }
+
+    .demo-kaart {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+
+    .demo-kaart-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .demo-samenvatting-lijn {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .demo-samenvatting-lijn:nth-child(2) { width: 90%; }
+    .demo-samenvatting-lijn:nth-child(3) { width: 75%; }
+    .demo-samenvatting-lijn:nth-child(4) { width: 85%; }
+    .demo-samenvatting-lijn:nth-child(5) { width: 60%; }
+
+    .demo-fc {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--blue);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .demo-vraag {
+      font-size: 12px;
+      color: var(--text);
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    .demo-optie {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    .demo-optie.juist { border-color: var(--accent); color: var(--accent); background: rgba(200,242,90,0.06); }
+    .demo-optie-punt { width: 14px; height: 14px; border-radius: 50%; border: 1px solid currentColor; flex-shrink: 0; }
+    .demo-optie.juist .demo-optie-punt { background: var(--accent); }
+
+    /* ── HOE HET WERKT ── */
+    .sectie {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 100px 24px;
+    }
+
+    .sectie-kop {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+
+    .sectie-label {
+      display: inline-block;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+
+    .sectie-titel {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .sectie-sub {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 500px;
+      margin: 0 auto;
+      line-height: 1.65;
+    }
+
+    /* Stappen */
+    .stappen-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+      background: var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 768px) { .stappen-grid { grid-template-columns: 1fr; } }
+
+    .stap {
+      background: var(--surface);
+      padding: 40px 36px;
+      position: relative;
+    }
+
+    .stap-nummer {
+      font-family: 'Fraunces', serif;
+      font-size: 72px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.04);
+      line-height: 1;
+      margin-bottom: 20px;
+      letter-spacing: -3px;
+    }
+
+    .stap-icon {
+      font-size: 32px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .stap-naam {
+      font-family: 'Fraunces', serif;
+      font-size: 22px;
+      font-weight: 500;
+      margin-bottom: 10px;
+      letter-spacing: -0.3px;
+    }
+
+    .stap-tekst {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── FEATURES ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 2px;
+      background: var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .feature {
+      background: var(--surface);
+      padding: 36px;
+      transition: background 0.2s;
+    }
+    .feature:hover { background: var(--surface2); }
+
+    .feature-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 18px;
+    }
+
+    .fi-groen  { background: rgba(200,242,90,0.1); }
+    .fi-blauw  { background: rgba(90,140,242,0.1); }
+    .fi-roze   { background: rgba(242,90,140,0.1); }
+    .fi-oranje { background: rgba(242,165,90,0.1); }
+    .fi-paars  { background: rgba(168,85,247,0.1); }
+    .fi-cyaan  { background: rgba(90,220,200,0.1); }
+
+    .feature-naam {
+      font-family: 'Fraunces', serif;
+      font-size: 19px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .feature-tekst {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── STUDYQUEST SPOTLIGHT ── */
+    .quest-sectie {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 100px;
+    }
+
+    .quest-kaart {
+      background: linear-gradient(135deg, #0f0a1e 0%, #1a0a2e 50%, #0a0f1e 100%);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: 24px;
+      padding: 64px;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+    }
+
+    @media (max-width: 768px) {
+      .quest-kaart { grid-template-columns: 1fr; padding: 40px 28px; }
+    }
+
+    .quest-kaart::before {
+      content: '';
+      position: absolute;
+      top: -100px; right: -100px;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .quest-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      background: rgba(168,85,247,0.1);
+      border: 1px solid rgba(168,85,247,0.25);
+      border-radius: 100px;
+      font-size: 11px;
+      color: #a855f7;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .quest-titel {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .quest-sub {
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 28px;
+    }
+
+    .quest-items {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .quest-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .quest-item::before {
+      content: '✦';
+      color: #a855f7;
+      font-size: 10px;
+    }
+
+    .quest-preview {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(168,85,247,0.15);
+      border-radius: 16px;
+      padding: 24px;
+      font-family: 'Press Start 2P', monospace;
+    }
+
+    .quest-level {
+      font-size: 9px;
+      color: #a855f7;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+    }
+
+    .quest-hud {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .quest-harten { font-size: 14px; letter-spacing: 2px; }
+
+    .quest-score {
+      font-size: 10px;
+      color: #f5c842;
+    }
+
+    .quest-vraag {
+      font-family: 'Fraunces', serif;
+      font-size: 13px;
+      color: white;
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+
+    .quest-opties {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .quest-optie {
+      padding: 8px 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      font-size: 9px;
+      color: rgba(255,255,255,0.5);
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .quest-optie.goed {
+      border-color: #c8f25a;
+      color: #c8f25a;
+      background: rgba(200,242,90,0.08);
+    }
+
+    /* ── TESTIMONIALS ── */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) { .testimonials-grid { grid-template-columns: 1fr; } }
+
+    .testimonial {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .testimonial-sterren {
+      color: #f5c842;
+      font-size: 14px;
+      letter-spacing: 2px;
+      margin-bottom: 14px;
+    }
+
+    .testimonial-tekst {
+      font-family: 'Fraunces', serif;
+      font-size: 16px;
+      font-style: italic;
+      font-weight: 400;
+      line-height: 1.6;
+      color: var(--text);
+      margin-bottom: 18px;
+    }
+
+    .testimonial-auteur {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .testimonial-avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .testimonial-naam { font-size: 14px; font-weight: 500; }
+    .testimonial-info { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+    /* ── PRIJZEN ── */
+    .prijzen-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) { .prijzen-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; } }
+
+    .prijs-kaart {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px;
+      position: relative;
+    }
+
+    .prijs-kaart.populair {
+      border-color: var(--accent);
+      background: var(--surface2);
+    }
+
+    .populair-badge {
+      position: absolute;
+      top: -12px; left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 16px;
+      background: var(--accent);
+      color: #000;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .prijs-naam {
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .prijs-bedrag {
+      font-family: 'Fraunces', serif;
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -2px;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .prijs-periode {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .prijs-features {
+      list-style: none;
+      margin-bottom: 28px;
+    }
+
+    .prijs-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--muted);
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .prijs-features li:last-child { border: none; }
+
+    .prijs-features li::before {
+      content: '✓';
+      color: var(--accent);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .prijs-features li.grijs::before { color: var(--border); }
+    .prijs-features li.grijs { opacity: 0.5; }
+
+    .prijs-knop {
+      display: block;
+      width: 100%;
+      padding: 13px;
+      border-radius: 100px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .prijs-knop.primair {
+      background: var(--accent);
+      color: #000;
+    }
+    .prijs-knop.primair:hover { box-shadow: 0 8px 24px rgba(200,242,90,0.3); }
+
+    .prijs-knop.secundair {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .prijs-knop.secundair:hover { border-color: var(--muted); }
+
+    /* ── FAQ ── */
+    .faq-lijst {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .faq-item {
+      border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+      cursor: pointer;
+    }
+
+    .faq-vraag {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 16px;
+      font-weight: 500;
+      gap: 16px;
+    }
+
+    .faq-plus {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      color: var(--muted);
+    }
+
+    .faq-item.open .faq-plus {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+      transform: rotate(45deg);
+    }
+
+    .faq-antwoord {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+    }
+
+    .faq-item.open .faq-antwoord {
+      max-height: 200px;
+      padding-top: 12px;
+    }
+
+    /* ── CTA SECTIE ── */
+    .cta-sectie {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 120px;
+    }
+
+    .cta-kaart {
+      background: linear-gradient(135deg, #0f150a 0%, #151f0a 50%, #0a150f 100%);
+      border: 1px solid rgba(200,242,90,0.15);
+      border-radius: 28px;
+      padding: 80px 48px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-kaart::before {
+      content: '';
+      position: absolute;
+      bottom: -150px; left: 50%;
+      transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(200,242,90,0.08) 0%, transparent 60%);
+    }
+
+    .cta-titel {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 700;
+      letter-spacing: -2px;
+      line-height: 1.05;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .cta-sub {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 36px;
+      position: relative;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer-logo {
+      font-family: 'Fraunces', serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .footer-logo span { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-links a {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--text); }
+
+    .footer-copy {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ── ANIMATIES ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-up {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-up.zichtbaar {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Press Start 2P font voor quest preview */
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="#" class="nav-logo">Study<span>Flow</span></a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#hoe-het-werkt">Hoe het werkt</a>
+      <a href="#prijzen">Prijzen</a>
+      <a href="/login">Inloggen</a>
+      <a href="/login" class="nav-cta">Gratis starten →</a>
+    </div>
+    <button class="hamburger" id="hamburger" onclick="wisselMenu()" aria-label="Menu openen">
+      <span class="h-lijn"></span>
+      <span class="h-lijn"></span>
+      <span class="h-lijn"></span>
+    </button>
+  </nav>
+
+  <!-- MOBIEL FULLSCREEN MENU -->
+  <div class="mobiel-menu" id="mobiel-menu">
+    <div class="menu-gloed"></div>
+    <nav class="mobiel-nav-links">
+      <a href="#features" class="mobiel-nav-link" onclick="sluitMenu()">Features</a>
+      <a href="#hoe-het-werkt" class="mobiel-nav-link" onclick="sluitMenu()">Hoe het werkt</a>
+      <a href="#prijzen" class="mobiel-nav-link" onclick="sluitMenu()">Prijzen</a>
+      <a href="/login" class="mobiel-nav-link" onclick="sluitMenu()">Inloggen</a>
+    </nav>
+    <div class="mobiel-cta-wrap">
+      <a href="/login" class="knop-groot" onclick="sluitMenu()">Gratis starten →</a>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-tag">✦ AI-aangedreven studeertool</div>
+    <h1 class="hero-titel">Upload. Leer. <em>Slaag.</em></h1>
+    <p class="hero-sub">Gooi je PDF erin en krijg binnen seconden een complete samenvatting, flashcards en een quiz. Studeren was nog nooit zo efficiënt.</p>
+    <div class="hero-knoppen">
+      <a href="/login" class="knop-groot">Gratis beginnen <span>→</span></a>
+      <a href="#hoe-het-werkt" class="knop-ghost">Hoe werkt het?</a>
+    </div>
+    <div class="social-proof">
+      <div class="avatars">
+        <div class="avatar av1">G</div>
+        <div class="avatar av2">S</div>
+        <div class="avatar av3">L</div>
+        <div class="avatar av4">M</div>
+      </div>
+      <div class="social-tekst">
+        <strong>Gratis te gebruiken</strong><br>
+        Geen creditcard nodig
+      </div>
+    </div>
+  </section>
+
+  <!-- DEMO SCHERM -->
+  <div class="demo-wrap fade-up">
+    <div class="demo-scherm">
+      <div class="demo-topbalk">
+        <div class="demo-cirkel dc-rood"></div>
+        <div class="demo-cirkel dc-geel"></div>
+        <div class="demo-cirkel dc-groen"></div>
+        <div class="demo-url">studyflow.app/studeren</div>
+      </div>
+      <div class="demo-inhoud">
+        <div class="demo-kaart">
+          <div class="demo-kaart-label">📝 Samenvatting</div>
+          <div class="demo-samenvatting-lijn" style="width:100%;height:10px;background:rgba(200,242,90,0.15);border-radius:4px;margin-bottom:10px"></div>
+          <div class="demo-samenvatting-lijn"></div>
+          <div class="demo-samenvatting-lijn"></div>
+          <div class="demo-samenvatting-lijn"></div>
+          <div class="demo-samenvatting-lijn"></div>
+          <div style="margin-top:12px">
+            <div class="demo-samenvatting-lijn" style="width:100%;height:10px;background:rgba(90,140,242,0.15);border-radius:4px;margin-bottom:10px"></div>
+            <div class="demo-samenvatting-lijn"></div>
+            <div class="demo-samenvatting-lijn" style="width:80%"></div>
+          </div>
+        </div>
+        <div class="demo-kaart">
+          <div class="demo-kaart-label">🃏 Flashcards</div>
+          <div class="demo-fc">Wat is het verschil tussen RAM en ROM?</div>
+          <div class="demo-fc">Definieer het begrip polymorfisme</div>
+          <div class="demo-fc">Wat is een DNS server?</div>
+        </div>
+        <div class="demo-kaart">
+          <div class="demo-kaart-label">⚡ Quiz</div>
+          <div class="demo-vraag">Welk OSI-model laag is verantwoordelijk voor routering?</div>
+          <div class="demo-optie">
+            <div class="demo-optie-punt"></div> Transportlaag
+          </div>
+          <div class="demo-optie juist">
+            <div class="demo-optie-punt"></div> Netwerklaag ✓
+          </div>
+          <div class="demo-optie">
+            <div class="demo-optie-punt"></div> Datalinklaag
+          </div>
+          <div class="demo-optie">
+            <div class="demo-optie-punt"></div> Applicatielaag
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOE HET WERKT -->
+  <section class="sectie" id="hoe-het-werkt">
+    <div class="sectie-kop fade-up">
+      <div class="sectie-label">Stap voor stap</div>
+      <h2 class="sectie-titel">Drie stappen naar <em style="font-style:italic;color:var(--accent)">betere cijfers</em></h2>
+      <p class="sectie-sub">Geen ingewikkelde setup. Upload, leer en slaag.</p>
+    </div>
+    <div class="stappen-grid fade-up">
+      <div class="stap">
+        <div class="stap-nummer">01</div>
+        <span class="stap-icon">📄</span>
+        <div class="stap-naam">Upload je PDF</div>
+        <div class="stap-tekst">Sleep je syllabus, samenvatting of cursus in de tool. Elk formaat PDF werkt — hoe groot ook.</div>
+      </div>
+      <div class="stap">
+        <div class="stap-nummer">02</div>
+        <span class="stap-icon">🤖</span>
+        <div class="stap-naam">AI analyseert</div>
+        <div class="stap-tekst">Onze AI leest het volledige document, herkent afbeeldingen en grafieken, en genereert gestructureerde studietools.</div>
+      </div>
+      <div class="stap">
+        <div class="stap-nummer">03</div>
+        <span class="stap-icon">🎯</span>
+        <div class="stap-naam">Studeer & slaag</div>
+        <div class="stap-tekst">Gebruik de samenvatting, oefen met flashcards, doe de quiz en speel StudyQuest om de stof te memoriseren.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="sectie" id="features" style="padding-top:0">
+    <div class="sectie-kop fade-up">
+      <div class="sectie-label">Wat je krijgt</div>
+      <h2 class="sectie-titel">Alles wat je nodig hebt <em style="font-style:italic;color:var(--accent)">in één tool</em></h2>
+    </div>
+    <div class="features-grid fade-up">
+      <div class="feature">
+        <div class="feature-icon fi-groen">📝</div>
+        <div class="feature-naam">Gestructureerde samenvatting</div>
+        <div class="feature-tekst">Met kopjes, opsommingen en beschrijvingen van afbeeldingen. Volledig aanpasbaar in de ingebouwde editor.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon fi-blauw">🃏</div>
+        <div class="feature-naam">Slimme flashcards</div>
+        <div class="feature-tekst">Minimaal 12 flashcards per document. Het systeem leert welke vragen je al kent en focust op de moeilijke.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon fi-roze">⚡</div>
+        <div class="feature-naam">Uitgebreide quiz</div>
+        <div class="feature-tekst">Tot 20 meerkeuzevragen met uitleg per antwoord. Mix van begrips-, concept- en toepassingsvragen.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon fi-paars">🎮</div>
+        <div class="feature-naam">StudyQuest</div>
+        <div class="feature-tekst">Speel door 5 epische levels met levens, combo meter en power-ups. Stijg op het leaderboard en verdien XP.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon fi-oranje">🔗</div>
+        <div class="feature-naam">Delen met anderen</div>
+        <div class="feature-tekst">Zet sessies openbaar en laat medestudenten jouw flashcards en quiz spelen. Ontdek wat anderen gedeeld hebben.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon fi-cyaan">🧠</div>
+        <div class="feature-naam">Adaptief leren</div>
+        <div class="feature-tekst">Het systeem houdt bij welke vragen je beheerst. Als je een vraag te goed kent genereert de AI automatisch nieuwe uitdagingen.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STUDYQUEST SPOTLIGHT -->
+  <section class="quest-sectie fade-up">
+    <div class="quest-kaart">
+      <div>
+        <div class="quest-badge">🎮 Nieuw</div>
+        <h2 class="quest-titel">Studeren voelt als <em style="font-style:italic;color:#a855f7">een spel</em></h2>
+        <p class="quest-sub">StudyQuest verandert je studiemateriaal in een episch avontuur. Reis door 5 werelden, versla eindbazen en klim van Beginner naar Onsterfelijk.</p>
+        <div class="quest-items">
+          <div class="quest-item">5 levels — Woud, Kasteel, Vulkaan, Ruimte, Eindbaas</div>
+          <div class="quest-item">Levens systeem met 3 harten</div>
+          <div class="quest-item">Combo meter tot ×5 punten multiplier</div>
+          <div class="quest-item">Power-ups: 50/50, Tijdstop, Tweede kans</div>
+          <div class="quest-item">Globaal leaderboard per sessie</div>
+          <div class="quest-item">XP systeem met 10 ranks</div>
+        </div>
+      </div>
+      <div class="quest-preview">
+        <div class="quest-level">⚔ LEVEL 3 — VULKAAN 🌋</div>
+        <div class="quest-hud">
+          <div class="quest-harten">❤️ ❤️ ❤️</div>
+          <div class="quest-score">🔥 COMBO ×3 | 2450 PTS</div>
+        </div>
+        <div class="quest-vraag">Welk protocol wordt gebruikt voor beveiligde webverbindingen?</div>
+        <div class="quest-opties">
+          <div class="quest-optie">HTTP</div>
+          <div class="quest-optie goed">HTTPS ✓</div>
+          <div class="quest-optie">FTP</div>
+          <div class="quest-optie">SMTP</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS -->
+  <section class="sectie" style="padding-top:0">
+    <div class="sectie-kop fade-up">
+      <div class="sectie-label">Wat studenten zeggen</div>
+      <h2 class="sectie-titel">Echt gebruikt door <em style="font-style:italic;color:var(--accent)">echte studenten</em></h2>
+    </div>
+    <div class="testimonials-grid fade-up">
+      <div class="testimonial">
+        <div class="testimonial-sterren">★★★★★</div>
+        <div class="testimonial-tekst">"Ik had een tentamen over 200 pagina's stof. In 10 minuten had ik een complete samenvatting met flashcards. Ik heb een 16 gehaald."</div>
+        <div class="testimonial-auteur">
+          <div class="testimonial-avatar" style="background:#5a8cf2;color:white">L</div>
+          <div>
+            <div class="testimonial-naam">Lena V.</div>
+            <div class="testimonial-info">Bachelor Informatica, KU Leuven</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial">
+        <div class="testimonial-sterren">★★★★★</div>
+        <div class="testimonial-tekst">"StudyQuest is verslavend. Ik studeer nu veel meer dan vroeger gewoon omdat het leuk is. Mijn vrienden gebruiken het ook al."</div>
+        <div class="testimonial-auteur">
+          <div class="testimonial-avatar" style="background:#f25a8c;color:white">M</div>
+          <div>
+            <div class="testimonial-naam">Mathias D.</div>
+            <div class="testimonial-info">Master Rechten, UGent</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial">
+        <div class="testimonial-sterren">★★★★★</div>
+        <div class="testimonial-tekst">"De tool herkent zelfs de grafieken en tabellen in mijn PDF en beschrijft ze in de samenvatting. Dat is echt uniek."</div>
+        <div class="testimonial-auteur">
+          <div class="testimonial-avatar" style="background:#c8f25a;color:#000">S</div>
+          <div>
+            <div class="testimonial-naam">Sarah M.</div>
+            <div class="testimonial-info">Bachelor Geneeskunde, ULiège</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIJZEN -->
+  <section class="sectie" id="prijzen" style="padding-top:0">
+    <div class="sectie-kop fade-up">
+      <div class="sectie-label">Transparante prijzen</div>
+      <h2 class="sectie-titel">Start gratis, <em style="font-style:italic;color:var(--accent)">upgrade wanneer je wil</em></h2>
+      <p class="sectie-sub">Geen verborgen kosten. Annuleer altijd.</p>
+    </div>
+    <div class="prijzen-grid fade-up">
+      <div class="prijs-kaart">
+        <div class="prijs-naam">Gratis</div>
+        <div class="prijs-bedrag">€0</div>
+        <div class="prijs-periode">voor altijd gratis</div>
+        <ul class="prijs-features">
+          <li>3 PDF analyses per maand</li>
+          <li>5 sessies opslaan</li>
+          <li>Flashcards & quiz</li>
+          <li>StudyQuest spelen</li>
+          <li class="grijs">Onbeperkt opslaan</li>
+          <li class="grijs">Sessies delen</li>
+        </ul>
+        <a href="/login" class="prijs-knop secundair">Gratis starten</a>
+      </div>
+      <div class="prijs-kaart populair">
+        <div class="populair-badge">Meest populair</div>
+        <div class="prijs-naam">Pro</div>
+        <div class="prijs-bedrag">€6<span style="font-size:24px">,99</span></div>
+        <div class="prijs-periode">per maand</div>
+        <ul class="prijs-features">
+          <li>Onbeperkt PDF analyses</li>
+          <li>Onbeperkt sessies opslaan</li>
+          <li>Flashcards & quiz</li>
+          <li>StudyQuest + leaderboard</li>
+          <li>Sessies delen & ontdekken</li>
+          <li>Prioriteit verwerking</li>
+        </ul>
+        <a href="/login" class="prijs-knop primair">Nu upgraden</a>
+      </div>
+      <div class="prijs-kaart">
+        <div class="prijs-naam">Klas</div>
+        <div class="prijs-bedrag">€29</div>
+        <div class="prijs-periode">per maand · 30 studenten</div>
+        <ul class="prijs-features">
+          <li>Alles uit Pro</li>
+          <li>Klasbeheer dashboard</li>
+          <li>Leraar maakt sessies aan</li>
+          <li>Voortgang per student</li>
+          <li>Gedeeld leaderboard</li>
+          <li>Prioriteit support</li>
+        </ul>
+        <a href="mailto:info@studyflow.app" class="prijs-knop secundair">Contact opnemen</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="sectie" style="padding-top:0">
+    <div class="sectie-kop fade-up">
+      <div class="sectie-label">Vragen</div>
+      <h2 class="sectie-titel">Veelgestelde <em style="font-style:italic;color:var(--accent)">vragen</em></h2>
+    </div>
+    <div class="faq-lijst fade-up">
+      <div class="faq-item" onclick="wisselFaq(this)">
+        <div class="faq-vraag">Welke PDF bestanden werken? <div class="faq-plus">+</div></div>
+        <div class="faq-antwoord">Alle standaard PDF bestanden werken — cursussen, syllabi, artikelen, boeken. Zowel tekstuele als gescande PDFs worden ondersteund. Voor de beste resultaten raden we een PDF met leesbare tekst aan.</div>
+      </div>
+      <div class="faq-item" onclick="wisselFaq(this)">
+        <div class="faq-vraag">Hoe lang duurt een analyse? <div class="faq-plus">+</div></div>
+        <div class="faq-antwoord">Een gemiddelde PDF van 20-50 pagina's wordt in 30-60 seconden verwerkt. Grotere documenten kunnen tot 2 minuten duren. De AI verwerkt het document in parallelle chunks voor maximale snelheid.</div>
+      </div>
+      <div class="faq-item" onclick="wisselFaq(this)">
+        <div class="faq-vraag">Is mijn studiemateriaal veilig? <div class="faq-plus">+</div></div>
+        <div class="faq-antwoord">Ja. Je PDFs worden uitsluitend gebruikt voor de analyse en nooit permanent opgeslagen op onze servers. Gegenereerde sessies worden beveiligd opgeslagen en zijn standaard privé — alleen jij hebt toegang tenzij je ze openbaar zet.</div>
+      </div>
+      <div class="faq-item" onclick="wisselFaq(this)">
+        <div class="faq-vraag">Werkt het in het Nederlands, Frans en Engels? <div class="faq-plus">+</div></div>
+        <div class="faq-antwoord">Ja. De AI detecteert automatisch de taal van je PDF en genereert de samenvatting, flashcards en quiz in diezelfde taal. Nederlands, Frans, Engels en de meeste andere Europese talen worden ondersteund.</div>
+      </div>
+      <div class="faq-item" onclick="wisselFaq(this)">
+        <div class="faq-vraag">Kan ik de samenvatting aanpassen? <div class="faq-plus">+</div></div>
+        <div class="faq-antwoord">Ja. De ingebouwde editor laat je de samenvatting volledig aanpassen — kopieer, voeg toe, pas opmaak aan, voeg links toe of voeg afbeeldingen in via URL. Wijzigingen worden permanent opgeslagen.</div>
+      </div>
+      <div class="faq-item" onclick="wisselFaq(this)">
+        <div class="faq-vraag">Kan ik mijn abonnement opzeggen? <div class="faq-plus">+</div></div>
+        <div class="faq-antwoord">Ja, altijd. Je kunt je Pro of Klas abonnement op elk moment opzeggen. Je behoudt toegang tot het einde van de betaalde periode. Je opgeslagen sessies blijven beschikbaar op het gratis plan.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-sectie fade-up">
+    <div class="cta-kaart">
+      <div class="sectie-label" style="margin-bottom:16px">Klaar om te beginnen?</div>
+      <h2 class="cta-titel">Jouw volgende tentamen <em style="font-style:italic;color:var(--accent)">gaat lukken.</em></h2>
+      <p class="cta-sub">Upload je eerste PDF gratis. Geen creditcard nodig.</p>
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;position:relative">
+        <a href="/login" class="knop-groot">Gratis starten → </a>
+        <a href="#hoe-het-werkt" class="knop-ghost">Meer leren</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <a href="#" class="footer-logo">Study<span>Flow</span></a>
+    <div class="footer-links">
+      <a href="#features">Features</a>
+      <a href="#prijzen">Prijzen</a>
+      <a href="/login">Inloggen</a>
+    </div>
+    <div class="footer-copy">© 2026 StudyFlow</div>
+  </footer>
+
+  <script>
+    // ── Hamburger menu ──
+    function wisselMenu() {
+      const menu = document.getElementById('mobiel-menu');
+      const knop = document.getElementById('hamburger');
+      const isOpen = menu.classList.contains('open');
+      menu.classList.toggle('open', !isOpen);
+      knop.classList.toggle('open', !isOpen);
+      document.body.classList.toggle('menu-open', !isOpen);
+    }
+
+    function sluitMenu() {
+      document.getElementById('mobiel-menu').classList.remove('open');
+      document.getElementById('hamburger').classList.remove('open');
+      document.body.classList.remove('menu-open');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') sluitMenu();
+    });
+
+    // ── Scroll animaties ──
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('zichtbaar');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+    // ── FAQ accordion ──
+    function wisselFaq(item) {
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+      if (!isOpen) item.classList.add('open');
+    }
+
+    // ── Nav achtergrond bij scrollen ──
+    window.addEventListener('scroll', () => {
+      document.querySelector('nav').style.borderBottomColor =
+        window.scrollY > 50 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)';
+    });
+  </script>
+</body>
+</html>
